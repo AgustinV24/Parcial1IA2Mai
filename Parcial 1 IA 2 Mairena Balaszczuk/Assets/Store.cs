@@ -2,24 +2,30 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using TMPro;
 using System;
+using UnityEngine.Serialization;
+
 public class Store : MonoBehaviour
 {
     public List<Product> productos = new List<Product>();
     public List<Product> productPrfabs;
-    public List<Client> clientes  = new List<Client>();
-    public List<Sale> ventas { get; set; } = new List<Sale>();
-
-
+    public List<Client> clientes = new List<Client>();
     public List<Product> shownProducts;
-
-    public List<Product> soldProducts;
     public Client currentClient;
     public List<string> currentCategories = new List<string>();
     int lastProductId = 0;
 
     public Transform firstPos;
 
+    public TextMeshProUGUI text;
+    public GameObject endCanvas;
+    public GameObject mainCanvas;
+    public TextMeshProUGUI mostSoldProduct;
+    public TextMeshProUGUI totalRevenue;
+    
+    private int _clientIndex = 0;
+    
     private void Start()
     {
         CreateProducts();
@@ -30,19 +36,15 @@ public class Store : MonoBehaviour
     {
         if (Input.GetMouseButtonDown(0))
         {
-            RaycastHit2D rayHit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero, Mathf.Infinity);
+            RaycastHit2D rayHit = Physics2D.Raycast(Camera.main.ScreenToWorldPoint(Input.mousePosition), Vector2.zero,
+                Mathf.Infinity);
             if (rayHit.collider != null && rayHit.transform.TryGetComponent<Product>(out Product prod))
             {
-
                 BuyProduct(prod);
             }
         }
-
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            Debug.Log(CalculateDailyRevenue());
-        }
     }
+
     public void UpdateUI()
     {
         foreach (var item in productos)
@@ -56,26 +58,25 @@ public class Store : MonoBehaviour
                 item.gameObject.SetActive(true);
             }
         }
+
         for (int i = 0; i < shownProducts.Count(); i++)
         {
-            if(i >= 20 / 2)
+            if (i >= 20 / 2)
             {
-                shownProducts[i].transform.position = firstPos.position + Vector3.right * (i - 20/2) * 2 - Vector3.up * 2;
+                shownProducts[i].transform.position =
+                    firstPos.position + Vector3.right * (i - 20 / 2) * 2 - Vector3.up * 2;
             }
             else
             {
-                shownProducts[i].transform.position = firstPos.position + Vector3.right * i  * 2;
+                shownProducts[i].transform.position = firstPos.position + Vector3.right * i * 2;
             }
-
-
         }
     }
+
     public void CreateProducts()
     {
-        
         foreach (var item in productPrfabs)
         {
-
             for (int i = 0; i < item.categoryProducts.Count(); i++)
             {
                 Product p = Instantiate(item);
@@ -95,7 +96,7 @@ public class Store : MonoBehaviour
                     p.onSale = true;
                     rand /= 2;
                 }
-             
+
                 p.price = rand;
                 p.priceText.text = "$ " + rand.ToString();
                 productos.Add(p);
@@ -106,8 +107,9 @@ public class Store : MonoBehaviour
                 string prodName = item.categoryProducts[UnityEngine.Random.Range(0, item.categoryProducts.Count())];
 
 
-                    productos.Where(x => x.nombre == prodName).First().cant++;
-                productos.Where(x => x.nombre == prodName).First().cantText.text = productos.Where(x => x.nombre == prodName).First().cant.ToString();
+                productos.Where(x => x.nombre == prodName).First().cant++;
+                productos.Where(x => x.nombre == prodName).First().cantText.text =
+                    productos.Where(x => x.nombre == prodName).First().cant.ToString();
 
                 productos.Where(x => x.nombre == prodName).First().totalStock++;
             }
@@ -117,71 +119,97 @@ public class Store : MonoBehaviour
 
         UpdateUI();
     }
+
     public void BuyProduct(Product product)
     {
-        if(productos.Contains(product) && productos.Find(x => x == product).cant > 0 && productos.Find(x => x == product).price < currentClient.money )
+        if (productos.Contains(product) && productos.Find(x => x == product).cant > 0 &&
+            productos.Find(x => x == product).price < currentClient.money)
         {
             productos.Find(x => x == product).cant -= 1;
             productos.Find(x => x == product).cantText.text = productos.Find(x => x == product).cant.ToString();
-           currentClient.money -= productos.Find(x => x == product).price;
-            if(currentClient.purschases.Where(x=> x.nombre == product.nombre).Any())
+            currentClient.money -= productos.Find(x => x == product).price;
+            if (currentClient.purchases.Where(x => x.nombre == product.nombre).Any())
             {
-                currentClient.purschases.Find(x => x.nombre == product.nombre).cant += 1;
+                currentClient.purchases.Find(x => x.nombre == product.nombre).cant += 1;
+                currentClient.totalPurchases++;
             }
             else
             {
-                Product newProd = Instantiate(product,currentClient.bag.position,Quaternion.identity);
+                Product newProd = Instantiate(product, currentClient.bag.position, Quaternion.identity);
                 newProd.cant = 1;
-                currentClient.purschases.Add(newProd);
+                currentClient.purchases.Add(newProd);
+                currentClient.totalPurchases++;
             }
         }
-        
-               
-    }
-    public Client GetCurrentClient()
-    {
-        return clientes.OrderByDescending(x => x.name).ThenByDescending(x => x.dni).First();
+
+        if (currentClient.totalPurchases >= 3 && _clientIndex < clientes.Count - 1)
+            NextClient();
+        else if (_clientIndex >= clientes.Count - 1)
+            ShowEndScreen();
     }
 
+    private void ShowEndScreen()
+    {
+        var productos = FindObjectsOfType<Product>();
+        foreach (var producto in productos)
+        {
+            producto.gameObject.SetActive(false);
+        }
+        mainCanvas.SetActive(false);
+        endCanvas.SetActive(true);
+        mostSoldProduct.text = MostSoldProduct();
+        totalRevenue.text = CalculateDailyRevenue().ToString();
+    }
+
+    public void NextClient()
+    {
+        _clientIndex++;
+        currentClient = clientes[_clientIndex];
+        text.text = "Cliente: " + currentClient.nombre + "       DNI: " + currentClient.dni;
+    }
+
+    public Client GetCurrentClient()
+    {
+        clientes = clientes.OrderBy(x => x.nombre).ThenBy(x => x.dni).ToList();
+        var client = clientes.First();
+        text.text = "Cliente: " + client.nombre + "       DNI: " + client.dni;
+        return client;
+    }
+    
     public void OrdeyByPrice()
     {
         shownProducts = OrderByPrice();
         UpdateUI();
-
     }
+
     public List<Product> OrderByPrice()
     {
         return shownProducts.OrderBy(x => x.price).ToList();
     }
 
-
-
     public string MostSoldProduct()
     {
-
         Dictionary<string, int> dic = new Dictionary<string, int>();
-        var col = clientes.SelectMany(x => x.purschases).Select(x => new { nombre = x.nombre, cant = x.cant }).Aggregate(dic, (acum, current) =>
-        {
-
-
-        //    Debug.Log(current.nombre);
-            if (acum.ContainsKey(current.nombre))
+        var col = clientes.SelectMany(x => x.purchases).Select(x => new { nombre = x.nombre, cant = x.cant }).Aggregate(
+            dic, (acum, current) =>
             {
-                acum[current.nombre] += current.cant;
-            }
-            else
-            {
-                acum.Add(current.nombre, current.cant);
-            }
-            return acum;
+                if (acum.ContainsKey(current.nombre))
+                {
+                    acum[current.nombre] += current.cant;
+                }
+                else
+                {
+                    acum.Add(current.nombre, current.cant);
+                }
 
-        });
+                return acum;
+            });
 
         string greatest = "";
         int maxCant = 0;
         foreach (var item in col)
         {
-            if(item.Value > maxCant)
+            if (item.Value > maxCant)
             {
                 maxCant = item.Value;
                 greatest = item.Key;
@@ -189,9 +217,7 @@ public class Store : MonoBehaviour
         }
         return greatest;
     }
-
-
-
+    
     public void ChangeShownProducts()
     {
         shownProducts = ObtenerProductosPorCategoria(currentCategories);
@@ -201,18 +227,16 @@ public class Store : MonoBehaviour
     public void AddCategory(string cat)
     {
         currentCategories.Add(cat);
-        if (cat == "None" )
+        if (cat == "None")
         {
             currentCategories.Clear();
         }
+
         ChangeShownProducts();
     }
-
-
-
-    public List<Product> ObtenerProductosPorCategoria(List<string> categoria )
+    
+    public List<Product> ObtenerProductosPorCategoria(List<string> categoria)
     {
-
         List<Product> sProducts = new List<Product>();
         if (categoria.Contains("None"))
         {
@@ -226,29 +250,26 @@ public class Store : MonoBehaviour
 
         if (categoria.Contains("Electronicos"))
         {
-            
-          sProducts = productos.OfType<Electronicos>().OrderBy(x => x.nombre).Concat(sProducts).ToList();
-
-
+            sProducts = productos.OfType<Electronicos>().OrderBy(x => x.nombre).Concat(sProducts).ToList();
         }
+
         if (categoria.Contains("Hogar"))
         {
-
             sProducts = productos.OfType<Hogar>().OrderBy(x => x.nombre).Concat(sProducts).ToList();
         }
+
         if (categoria.Contains("Alimentos"))
         {
-
             sProducts = productos.OfType<Alimentos>().OrderBy(x => x.nombre).Concat(sProducts).ToList();
         }
+
         if (categoria.Contains("Limpieza"))
         {
-
             sProducts = productos.OfType<Limpieza>().OrderBy(x => x.nombre).Concat(sProducts).ToList();
         }
+
         if (categoria.Contains("Mascotas"))
         {
-
             sProducts = productos.OfType<Mascotas>().OrderBy(x => x.nombre).Concat(sProducts).ToList();
         }
 
@@ -261,6 +282,7 @@ public class Store : MonoBehaviour
         shownProducts = HighlightPurchasableProducts();
         UpdateUI();
     }
+
     public List<Product> HighlightPurchasableProducts()
     {
         return productos.Where(x => x.price < currentClient.money && x.cant > 0).OrderBy(x => x.id).ToList();
@@ -268,12 +290,8 @@ public class Store : MonoBehaviour
 
     public float CalculateDailyRevenue()
     {
-        return productos.Select(x => new { price = x.price,cant = x.totalStock - x.cant}).Aggregate(0f, (acum, current) =>
-        {
-            return acum + current.price * current.cant;
-
-        });
-
+        return productos.Select(x => new { price = x.price, cant = x.totalStock - x.cant })
+            .Aggregate(0f, (acum, current) => { return acum + current.price * current.cant; });
     }
 
     public void HighlightSaleObjects()
@@ -281,10 +299,10 @@ public class Store : MonoBehaviour
         shownProducts = HightlightOnSaleProducts();
         UpdateUI();
     }
+
     public List<Product> HightlightOnSaleProducts()
     {
         return productos.Where(x => x.onSale).ToList();
-
     }
 
     public void GetCheapProductsVoid()
@@ -292,6 +310,7 @@ public class Store : MonoBehaviour
         shownProducts = GetCheapProducts();
         UpdateUI();
     }
+
     public List<Product> GetCheapProducts()
     {
         return productos.OrderBy(x => x.price).Take(3).ToList();
@@ -302,9 +321,9 @@ public class Store : MonoBehaviour
         shownProducts = GetExpensiveProducts();
         UpdateUI();
     }
+
     public List<Product> GetExpensiveProducts()
     {
         return productos.OrderByDescending(x => x.price).TakeWhile(x => x.price >= 600).ToList();
-
     }
 }
