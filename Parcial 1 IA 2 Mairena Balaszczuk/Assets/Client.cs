@@ -4,9 +4,8 @@ using UnityEngine;
 
 public class Client : MonoBehaviour
 {
-    public int dni { get; set; }
-    public string nombre { get; set; }
-    public string correo { get; set; }
+    public int dni;
+    public string nombre;
 
     public List<Product> purschases;
     public int money;

@@ -23,14 +23,7 @@ public class Store : MonoBehaviour
     private void Start()
     {
         CreateProducts();
-        //productos.Add(new List<Product>
-        //{
-        //    new Product { id = 1, Nombre = "Laptop", Categoria = "Electrónica", Precio = 1000m, Cantidad = 10 },
-        //    new Product { id = 2, Nombre = "Teléfono", Categoria = "Electrónica", Precio = 500m, Cantidad = 20 },
-        //    new Product { id = 3, Nombre = "Mesa", Categoria = "Muebles", Precio = 150m, Cantidad = 5 },
-        //    new Product { id = 4, Nombre = "Silla", Categoria = "Muebles", Precio = 75m, Cantidad = 15 },
-        //    new Product { id = 5, Nombre = "Televisor", Categoria = "Electrónica", Precio = 800m, Cantidad = 7 }
-        //});
+        currentClient = GetCurrentClient();
     }
 
     private void Update()
@@ -47,7 +40,7 @@ public class Store : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            Debug.Log(MostSoldProduct());
+            Debug.Log(CalculateDailyRevenue());
         }
     }
     public void UpdateUI()
@@ -94,7 +87,7 @@ public class Store : MonoBehaviour
                 p.myRend.sprite = item.productSprite[i];
                 p.cant = 1;
                 p.cantText.text = "1";
-
+                p.totalStock = 1;
                 p.category = item.category;
                 int rand = UnityEngine.Random.Range(100, 1000);
                 if (UnityEngine.Random.Range(0, 100) < 10)
@@ -116,6 +109,7 @@ public class Store : MonoBehaviour
                     productos.Where(x => x.nombre == prodName).First().cant++;
                 productos.Where(x => x.nombre == prodName).First().cantText.text = productos.Where(x => x.nombre == prodName).First().cant.ToString();
 
+                productos.Where(x => x.nombre == prodName).First().totalStock++;
             }
         }
 
@@ -146,7 +140,7 @@ public class Store : MonoBehaviour
     }
     public Client GetCurrentClient()
     {
-        return clientes.OrderBy(x => x.name).ThenBy(x => x.dni).First();
+        return clientes.OrderByDescending(x => x.name).ThenByDescending(x => x.dni).First();
     }
 
     public void OrdeyByPrice()
